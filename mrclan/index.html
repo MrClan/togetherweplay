@@ -162,18 +162,6 @@ input[type="radio"]:checked + label span {
 	  };
 	  firebase.initializeApp(config);
 	  
-	  function ReadDb(){
-		// Get a reference to the database service
-		var db = firebase.database();
-		var userId = firebase.auth().currentUser.uid;
-		return db.ref('/users/' + userId).once('value').then(function(snapshot) {
-		  var g = snapshot.val().games;
-		  alert(g);
-		  // ...
-		});
-		
-	  }
-	  
 	function writeUserData(userId, name, email, imageUrl, authProvider) {
 	  firebase.database().ref('users/' + userId).update({//.set({
 		username: name,
@@ -193,14 +181,20 @@ input[type="radio"]:checked + label span {
 			$('#fbSignout').hide();
 			$('#gSignout').show();
 		  }
-		  
-		  $('#txtOtherDetails').val(g.otherdetails);
-		  $('#txtPsnId').val(g.psnid);
+		  $('#hdnAuthFrom').val(g.authFrom);
 		  $('#ddlMyGame').val(g.currentGame);
-		  $('#ddlStatus').val(g.status);
+		  $('#ddlMyPlatform').val(g.platform);
+		  $('#hdnEmail').val(g.email);
 		  $('#ddlISP').val(g.isp);
-		  $('#displayName').text(g.username);
+		  $('#hdnLastGame').val(g.currentGame);
+		  $('#txtOtherDetails').val(g.otherdetails);
 		  $('imgUser').attr('src',g.profile_picture);
+		  $('#txtPsnId').val(g.psnid);
+		  $('#ddlStatus').val(g.status);
+		  $('#hdnUsername').val(g.username);
+		  $('#displayName').text(g.username);
+		  
+		  SetTopStatus(g.status,g.currentGame, g.platform);
 		});
 	}
 	  
@@ -319,6 +313,18 @@ input[type="radio"]:checked + label span {
 		  
 		  writeUserData(uid, displayName, email, photoURL, providerData[0]["providerId"]);
 		  
+		  
+			// Clear all previous pokes and start listening to new pokes from other users
+			firebase.database().ref('/pokes/' + uid).remove().then(function(){
+				firebase.database().ref('/pokes/' + uid).on('value',function(snapshot) {
+					var g = snapshot.val();
+					if(g!= null){
+						notifyMe(g['by'] + ' just poked you');
+					}
+				});
+			});
+			
+		  
 		  document.getElementById('#imgUser').setAttribute('src',photoURL);
 		  
 		  document.getElementById('divLoggedIn').style.display = 'block';
@@ -358,52 +364,129 @@ input[type="radio"]:checked + label span {
       //initApp();
     };
 	
+	function SetTopStatus(status, game, platform){
+		var imgDetails = '';
+		var pTop = '';
+		if(status == 'available'){
+			imgDetails = 'src="images/green-dot.png" title="Available - Free to play" alt="available"';
+			pTop = 'Available - Free to play';
+		} else if(status === 'away'){
+			imgDetails = 'src="images/orange-dot.png" title="Busy - But may be interested" alt="may be away"';
+			pTop = 'Busy - But may be interested';
+		}
+		else{
+			imgDetails = 'src="images/red-dot.png" title="Busy - But may be interested" alt="may be away"';
+			pTop = 'Offline - Not interested right now';
+		}
+		var imgTop = '<img style="height:12px;margin:-2px 9px -2px 0px;"'+imgDetails+'/>';
+		pTop = 'MY PRESENT STATUS<br/>' + imgTop + pTop + '<br/><b>' + game + ' on ' +  platform + '</b><br/>Status updated on: ' + '3hrs ago';
+		$('#pStatusTop').html(pTop);
+	}
+	
+	function playSound(){
+		var snd = new Audio("audio/jingle.mp3");
+		snd.play();
+	}
+	
+	function spawnNotification(theBody) {
+		var theTitle = "WePlay";
+		var theIcon = "images/me.jpg";
+		var options = {
+			body: theBody,
+			icon: theIcon
+		}
+		playSound();
+		var n = new Notification(theTitle,options);
+	}
+	
+	function notifyMe(msg) {
+	  // Let's check if the browser supports notifications
+	  if (!("Notification" in window)) {
+		//alert("This browser does not support desktop notification");
+	  }
+
+	  // Let's check whether notification permissions have already been granted
+	  else if (Notification.permission === "granted") {
+		// If it's okay let's create a notification
+		spawnNotification(msg);
+	  }
+
+	  // Otherwise, we need to ask the user for permission
+	  else if (Notification.permission !== 'denied') {
+		Notification.requestPermission(function (permission) {
+		  // If the user accepts, let's create a notification
+		  if (permission === "granted") {
+			//var notification = new Notification("Hi there!");
+			spawnNotification("All Set! WePlay will notify if you are poked by someone.");
+		  }
+		});
+	  }
+
+	  // At last, if the user has denied notifications, and you 
+	  // want to be respectful there is no need to bother them any more.
+	}
+	
 	$(document).ready(function(){
 		initApp();
+		//notifyMe("FifaGodd poked you");
+		var listeningToPoke = false;
 		$('button#btnSetProfileData').on('click', document, function(){
-			var myISP = $('#ddlISP').val();
-			var myStatus = $('#ddlStatus').val();
-			var myPsnId = $('#txtPsnId').val();
+			var myAuthFrom = $('#hdnAuthFrom').val();
 			var myGame = $('#ddlMyGame').val();
+			var myEmail = $('#hdnEmail').val();
+			var myISP = $('#ddlISP').val();
+			var myLastGame = $('#hdnLastGame').val();
 			var myOtherDetails = $('#txtOtherDetails').val();
+			var myPlatform = $('#ddlMyPlatform').val();
+			var myProfilePic = $('#hdnProfilePic').val();
+			var myPsnId = $('#txtPsnId').val();
+			var myStatus = $('#ddlStatus').val();
+			var myUsername = $('#hdnUsername').val();
 			var userId = firebase.auth().currentUser.uid;
 			var profileData = {
-				isp: myISP,
-				status: myStatus,
-				psnid: myPsnId,
+				authFrom: myAuthFrom,
 				currentGame: myGame,
-				otherdetails: myOtherDetails
+				email: myEmail,
+				isp: myISP,
+				lastGame: myLastGame,
+				otherdetails: myOtherDetails,
+				platform: myPlatform,
+				profile_picture: myProfilePic,
+				psnid: myPsnId,
+				status: myStatus,
+				username: myUsername
 			};
 			var onlineStatus = {
 				user: myPsnId,
 				status: myStatus
 			};
 			
-			// TODO: do not forget to remove the user from its previous game
+			// TODO: do not forget to remove the user from their  previous game
 			var updates = {};
 			updates['users/' + userId] = profileData;
 			updates['onlinenow/' + myGame + '/' + userId] = profileData;
-			firebase.database().ref().update(updates);
-			var imgDetails = '';
-			var pTop = '';
-			if(myStatus == 'available'){
-				imgDetails = 'src="images/green-dot.png" title="Available - Free to play" alt="available"';
-				pTop = 'Available - Free to play';
-			} else if(myStatus === 'away'){
-				imgDetails = 'src="images/orange-dot.png" title="Busy - But may be interested" alt="may be away"';
-				pTop = 'Busy - But may be interested';
-			}
-			else{
-				imgDetails = 'src="images/red-dot.png" title="Busy - But may be interested" alt="may be away"';
-				pTop = 'Offline - Not interested right now';
-			}
-			var imgTop = '<img style="height:12px;margin:-2px 9px -2px 0px;"'+imgDetails+'/>';
-			pTop = 'MY PRESENT STATUS<br/>' + imgTop + pTop + '<br/><b>' + myGame + '</b><br/>Status updated on: ' + '3hrs ago';
-			$('#pStatusTop').html(pTop);
-			
-			/*firebase.database().ref('users/' + userId).update().then(function(result){
-				alert('profile updated');
-			});*/
+			firebase.database().ref().update(updates).then(function(){
+				// retrieve users profile data, and mark his last game as offline
+				var db = firebase.database();
+				var userId = firebase.auth().currentUser.uid;
+				db.ref('/users/' + userId).once('value').then(function(snapshot) {
+				  var g = snapshot.val();
+				  var lastGame = g["lastGame"];
+				  var currentGame = g["currentGame"];
+				  if(lastGame === currentGame){
+				  }else{
+					console.log('marking the user as offline in their previous game');
+					var upd = {};
+					upd['onlinenow/' + lastGame + '/' + userId] = null;
+					g["lastGame"] = currentGame;
+					upd['users/' + userId] = g;
+					firebase.database().ref().update(upd).then(function(){
+						$('#hdnLastGame').val(currentGame);
+					});
+				  }
+				});
+			});
+			SetTopStatus(myStatus, myGame, myPlatform);
 		});
 		
 		var lastSearch = '';
@@ -418,15 +501,17 @@ input[type="radio"]:checked + label span {
 				// turn off the listener on this node by calling off
 			}
 			
+			
+			
 			return db.ref('/onlinenow/' + curGame).on('value',function(snapshot) {
 				var g = snapshot.val();
-				console.log(g);
 				lastSearch = curGame;
 				// populate the search table with latest data
 				if(g == null){
 					$('#tblSearch>tbody').html('<td colspan="3" style="text-align:center;">Seems like no one is interested in this game right now</td>');
 				} else{
 					$('#tblSearch>tbody').html('');
+					var myPsnId = $('#txtPsnId').val().trim();
 					for(x in g){
 						var c = g[x];
 						var imgDetails = '';
@@ -435,10 +520,27 @@ input[type="radio"]:checked + label span {
 						} else{
 							imgDetails = 'src="images/orange-dot.png" title="Busy - But may be interested" alt="may be away"';
 						}
-						var row = $('<tr><td><img style="height:12px;margin:-2px 9px;"'+imgDetails+'/>'+c['psnid']+'</td><td>Poke them</td></tr>');
+						var row = $('<tr><td><img style="height:12px;margin:-2px 9px;"'+imgDetails+'/>'+c['psnid']+' ('+c['platform']+')'+'</td><td>' + (myPsnId == c['psnid']? 'YOU' : ('<button class="button button-primary btnPoke" uid="'+x+'">Poke/Knock</button>')) + '</td></tr>');
 						$('#tblSearch>tbody').append(row);
 					}
 				}
+			});
+		});
+		
+		
+		// Handle Poke
+		$('body').on('click', '.btnPoke', function(){
+			var tgtUser = $(this).attr('uid');
+			var userId = firebase.auth().currentUser.uid;
+			firebase.database().ref('pokes/' + tgtUser).update({
+				by: $('#hdnUsername').val(),
+				on: (new Date()),
+				count: 1
+			}).then(function(){
+				// start a timer of 3 minutes to delete that poke, so that the user can poke again
+				setTimeout(function(){
+					firebase.database().ref('pokes/' + tgtUser + '/' + userId).remove();
+				}, 180000);
 			});
 		});
 	});
@@ -454,16 +556,6 @@ input[type="radio"]:checked + label span {
 		<div class="ten columns" style="text-align:center;">
 			<h1 class='insetshadow'>We Play Together</h1>
 			
-			  <p>
-				TODOS: 
-					Design - switchable theme probably
-					Poke Receive and notifications
-					Delete node when game changes from the online status
-					Turn off listening when game changes
-					Timer to update status automatically
-					Show user details to other users too
-					Click top status to update current status quickly
-			  </p>
 			
 			  <!-- Button that handles sign-in/sign-out -->
 			  <button disabled class="button button-primary" id="Google_quickstart-sign-in">Sign in with Google</button>
@@ -525,12 +617,34 @@ input[type="radio"]:checked + label span {
 		</div>
 	</div>
 	<div class="row">
-		<div class="four columns">I want to play</div>
+		<div class="four columns">
+			I want to play
+			<input type="hidden" id="hdnAuthFrom" />
+			<input type="hidden" id="hdnEmail" />
+			<input type="hidden" id="hdnLastGame" />
+			<input type="hidden" id="hdnProfilePic" />
+			<input type="hidden" id="hdnUsername" />
+		</div>
 		<div class="four columns">
 			<select class="u-full-width" id="ddlMyGame">
 				<option>Fifa 16</option>
 				<option>Fifa 17</option>
 				<option>GTA 5</option>
+			</select>
+	  </div>
+	</div>
+	
+	<div class="row">
+		<div class="four columns">
+			My Platform
+		</div>
+		<div class="four columns">
+			<select class="u-full-width" id="ddlMyPlatform">
+				<option>PlayStation 4</option>
+				<option>PlayStation 3</option>
+				<option>XBox</option>
+				<option>PC</option>
+				<option>Mobile</option>
 			</select>
 	  </div>
 	</div>
@@ -580,7 +694,7 @@ input[type="radio"]:checked + label span {
 		</div>
 		<div class="two columns"></div>
 	</div>
-  
+
   
   	<div class="row" style="display:none;">
 	<!-- Container for the demo -->
@@ -616,6 +730,18 @@ input[type="radio"]:checked + label span {
 		<h4>SQL JOINS</h4>
 		<a class="button button-primary" href="/Gaming%20Helper%20Website/Skeleton-2.0.4/index.html/mainDesign.html">Main Design</a>
         <p>This index.html page is a placeholder with the CSS, font and favicon. It's just waiting for you to add some content! If you need some help hit up the <a href="http://www.getskeleton.com">Skeleton documentation</a>.</p>
+		
+		
+			  <p>
+				TODOS:
+					Delete node when game changes from the online status : Last Game should be offline
+					Design - switchable theme probably
+					Poke Receive and notifications
+					Turn off listening when game changes
+					Timer to update status automatically
+					Show user details to other users too
+					Click top status to update current status quickly
+			  </p>
 		
       </div>
     </div>

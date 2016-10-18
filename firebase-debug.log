@@ -1,0 +1,14 @@
+[debug] ----------------------------------------------------------------------
+[debug] Command:      C:\Program Files\nodejs\node.exe C:\Users\Pratik\AppData\Roaming\npm\node_modules\firebase-tools\bin\firebase serve
+[debug] CLI Version:  3.0.8
+[debug] Platform:     win32
+[debug] Node Version: v6.0.0
+[debug] Time:         Tue Oct 18 2016 19:58:12 GMT+0545 (Nepal Standard Time)
+[debug] ----------------------------------------------------------------------
+[debug] 
+[info] Starting Firebase development server...
+[info] 
+[info] Project Directory: G:\Gaming Helper Website\Skeleton-2.0.4\fbGaming
+[info] Public Directory: mrclan
+[info] 
+[info] Server listening at: http://localhost:5000
